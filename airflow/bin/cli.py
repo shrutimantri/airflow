@@ -962,6 +962,7 @@ def worker(args):
         'queues': args.queues,
         'concurrency': args.concurrency,
         'hostname': args.celery_hostname,
+        'loglevel': settings.LOGGING_LEVEL,
     }
 
     if args.daemon:
