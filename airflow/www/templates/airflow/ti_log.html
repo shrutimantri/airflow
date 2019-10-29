@@ -70,6 +70,16 @@ limitations under the License.
              && ($(window).scrollTop() + $(window).height() > docHeight - AUTO_TAILING_OFFSET);
     }
 
+    // el and escapeHtml have been added to the new base.js in newer
+    // Airflow versions, and they can be removed from here once we
+    // get base.js.
+    var el = document.createElement("span");
+
+    function escapeHtml(text) {
+      el.textContent = text;
+      return el.innerHTML;
+    }
+
     // Streaming log with auto-tailing.
     function autoTailingLog(try_number, metadata=null, auto_tailing=false) {
       console.debug("Auto-tailing log for dag_id: {{ dag_id }}, task_id: {{ task_id }}, \
@@ -104,10 +114,18 @@ limitations under the License.
           if (res.message) {
             // Auto scroll window to the end if current window location is near the end.
             if(auto_tailing && checkAutoTailingCondition()) {
-              var should_scroll = true
+              var should_scroll = true;
             }
             // The message may contain HTML, so either have to escape it or write it as text.
-            document.getElementById(`try-${try_number}`).textContent += res.message + "\n";
+            var escaped_message = escapeHtml(res.message);
+
+            // Detect urls
+            var url_regex = /http(s)?:\/\/[\w\.\-]+(\.?:[\w\.\-]+)*([\/?#][\w\-\._~:/?#[\]@!\$&'\(\)\*\+,;=\.%]+)?/g;
+            var linkified_message = escaped_message.replace(url_regex, function(url) {
+              return "<a href=\"" + url + "\" target=\"_blank\">" + url + "</a>";
+            });
+
+            document.getElementById(`try-${try_number}`).innerHTML += linkified_message + "<br/>";
             // Auto scroll window to the end if current window location is near the end.
             if(should_scroll) {
               $("html, body").animate({ scrollTop: $(document).height() }, ANIMATION_SPEED);
