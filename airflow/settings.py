@@ -209,6 +209,11 @@ def configure_adapters():
         MySQLdb.converters.conversions[Pendulum] = MySQLdb.converters.DateTime2literal
     except ImportError:
         pass
+    try:
+        import pymysql.converters
+        pymysql.converters.conversions[Pendulum] = pymysql.converters.escape_datetime
+    except ImportError:
+        pass
 
 
 def configure_action_logging():
