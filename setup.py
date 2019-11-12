@@ -272,7 +272,7 @@ def do_setup():
             'bleach==2.1.2',
             'configparser>=3.5.0, <3.6.0',
             'croniter>=0.3.17, <0.4',
-            'dill>=0.2.2, <0.3',
+            'dill>=0.2.2, <=0.3',
             'flask>=0.12.4, <0.13',
             'flask-appbuilder>=1.11.1, <2.0.0',
             'flask-admin==1.4.1',
