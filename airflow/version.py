@@ -18,4 +18,4 @@
 # under the License.
 #
 
-version = '1.10.0+twtr24'
+version = '1.10.0+twtr25'
