@@ -119,6 +119,10 @@ class KubeConfig:
         # this will set to True if so
         self.dags_in_image = conf.getboolean(self.kubernetes_section, 'dags_in_image')
 
+        # Run as user for pod security context
+        self.worker_run_as_user = self._get_security_context_val('run_as_user')
+        self.worker_fs_group = self._get_security_context_val('fs_group')
+
         # NOTE: `git_repo` and `git_branch` must be specified together as a pair
         # The http URL of the git repository to clone from
         self.git_repo = conf.get(self.kubernetes_section, 'git_repo')
@@ -184,6 +188,15 @@ class KubeConfig:
         self.airflow_configmap = conf.get(self.kubernetes_section, 'airflow_configmap')
 
         self._validate()
+
+    # pod security context items should return integers
+    # and only return a blank string if contexts are not set.
+    def _get_security_context_val(self, scontext):
+        val = configuration.get(self.kubernetes_section, scontext)
+        if len(val) == 0:
+            return val
+        else:
+            return int(val)
 
     def _validate(self):
         if not self.dags_volume_claim and not self.dags_in_image \

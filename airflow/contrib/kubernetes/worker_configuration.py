@@ -102,6 +102,18 @@ class WorkerConfiguration(LoggingMixin):
             return []
         return self.kube_config.image_pull_secrets.split(',')
 
+    def _get_security_context(self):
+        """Defines the security context"""
+        security_context = {}
+
+        if self.kube_config.worker_run_as_user:
+            security_context['runAsUser'] = self.kube_config.worker_run_as_user
+
+        if self.kube_config.worker_fs_group:
+            security_context['fsGroup'] = self.kube_config.worker_fs_group
+
+        return security_context
+
     def init_volumes_and_mounts(self):
         dags_volume_name = 'airflow-dags'
         logs_volume_name = 'airflow-logs'
@@ -223,5 +235,6 @@ class WorkerConfiguration(LoggingMixin):
             volumes=volumes,
             volume_mounts=volume_mounts,
             resources=resources,
-            annotations=annotations
+            annotations=annotations,
+            security_context=self._get_security_context()
         )
