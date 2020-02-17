@@ -80,7 +80,9 @@ class WorkerConfiguration(LoggingMixin):
     def _get_environment(self):
         """Defines any necessary environment variables for the pod executor"""
         env = {
-            'AIRFLOW__CORE__DAGS_FOLDER': '/tmp/dags',
+            #[TODO:Sumit] Understand why dags_folder is being set to
+            # /tmp and fix in upstream if needed
+            #'AIRFLOW__CORE__DAGS_FOLDER': '/tmp/dags',
             'AIRFLOW__CORE__EXECUTOR': 'LocalExecutor'
         }
         if self.kube_config.airflow_configmap:
@@ -178,22 +180,24 @@ class WorkerConfiguration(LoggingMixin):
                 dags_volume_mount['subPath'] = self.kube_config.dags_volume_subpath
             volume_mounts.append(dags_volume_mount)
 
+        # [TODO: Sumit] As we already have the airflow.cfg inside home_folder of
+        # airflow this mounts is failing, need to do a upstream fix
         # Mount the airflow.cfg file via a configmap the user has specified
-        if self.kube_config.airflow_configmap:
-            config_volume_name = 'airflow-config'
-            config_path = '{}/airflow.cfg'.format(self.worker_airflow_home)
-            volumes.append({
-                'name': config_volume_name,
-                'configMap': {
-                    'name': self.kube_config.airflow_configmap
-                }
-            })
-            volume_mounts.append({
-                'name': config_volume_name,
-                'mountPath': config_path,
-                'subPath': 'airflow.cfg',
-                'readOnly': True
-            })
+        # if self.kube_config.airflow_configmap:
+        #     config_volume_name = 'airflow-config'
+        #     config_path = '{}/airflow.cfg'.format(self.worker_airflow_home)
+        #     volumes.append({
+        #         'name': config_volume_name,
+        #         'configMap': {
+        #             'name': self.kube_config.airflow_configmap
+        #         }
+        #     })
+        #     volume_mounts.append({
+        #         'name': config_volume_name,
+        #         'mountPath': config_path,
+        #         'subPath': 'airflow.cfg',
+        #         'readOnly': True
+        #     })
 
         return volumes, volume_mounts
 
@@ -236,5 +240,6 @@ class WorkerConfiguration(LoggingMixin):
             volume_mounts=volume_mounts,
             resources=resources,
             annotations=annotations,
-            security_context=self._get_security_context()
+            security_context=self._get_security_context(),
+            configmaps=self.kube_config.airflow_configmap.split(',')
         )

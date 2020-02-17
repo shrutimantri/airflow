@@ -78,7 +78,8 @@ class Pod:
             resources=None,
             annotations=None,
             affinity=None,
-            security_context=None
+            security_context=None,
+            configmaps=None
     ):
         self.image = image
         self.envs = envs or {}
@@ -100,3 +101,5 @@ class Pod:
         self.annotations = annotations or {}
         self.affinity = affinity or {}
         self.security_context = security_context or {}
+        self.configmaps = configmaps or []
+

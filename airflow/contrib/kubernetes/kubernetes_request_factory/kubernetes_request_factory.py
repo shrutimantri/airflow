@@ -139,6 +139,16 @@ class KubernetesRequestFactory:
                 KubernetesRequestFactory.add_secret_to_env(env, secret)
             req['spec']['containers'][0]['env'] = env
 
+            req['spec']['containers'][0]['envFrom'] = []
+            for configmap in pod.configmaps:
+                req['spec']['containers'][0]['envFrom'].append(
+                {
+                    'configMapRef': {
+                        'name': configmap
+                    }
+                }
+            )
+
     @staticmethod
     def extract_resources(pod, req):
         if not pod.resources or pod.resources.is_empty_resource_request():
