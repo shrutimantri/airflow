@@ -284,9 +284,7 @@ class WorkerConfiguration(LoggingMixin):
             }
 
         # Mount the airflow.cfg file via a configmap the user has specified
-        # [TODO: Sumit] As we already have the airflow.cfg inside home_folder of
-        # airflow this mounts is failing, need to do a upstream fix
-        if False: # self.kube_config.airflow_configmap:
+        if self.kube_config.airflow_configmap:
             config_volume_name = 'airflow-config'
             config_path = '{}/airflow.cfg'.format(self.worker_airflow_home)
             volumes[config_volume_name] = {
