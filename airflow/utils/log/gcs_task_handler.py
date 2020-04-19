@@ -115,9 +115,44 @@ class GCSTaskHandler(FileTaskHandler, LoggingMixin):
             log = '*** Unable to read remote log from {}\n*** {}\n\n'.format(
                 remote_loc, str(e))
             self.log.error(log)
-            local_log, metadata = super(GCSTaskHandler, self)._read(ti, try_number)
-            log += local_log
-            return log, metadata
+            #TODO Sumit: Raise a PR in open source
+            if configuration.conf.get('core', 'executor') == 'KubernetesExecutor':
+                log = '*** Trying to get logs from worker pod {}\n ***'.format(
+                    ti.hostname
+                )
+                self.log.error(log)
+                try:
+                    logs = self._read_pod_logs(ti.hostname, configuration.conf.get('kubernetes', 'namespace'))
+                    return logs, {'end_of_log': True}
+                except Exception as f:
+                    log = '*** Unable to fetch logs from worker pod {}\n*** {}\n\n'.format(
+                        ti.hostname, str(f)
+                    )
+                    self.log.error(log)
+            else:
+                local_log, metadata = super(GCSTaskHandler, self)._read(ti, try_number)
+                log += local_log
+                return log, metadata
+
+    def _read_pod_logs(self, pod_name, namespace):
+        """
+        Tries to fetch execution logs (last 100 lines) from the pod and returns them.
+        May raise exceptions if pod not found or encounter perms issues
+        :param pod_name: the name of the worker pod
+        :type pod_name: str
+        :param namespace: the namespace on which the pod would be running
+        :type namespace: str
+        """
+        from airflow.contrib.kubernetes.kube_client import get_kube_client
+        kube_client = get_kube_client()
+        return kube_client.read_namespaced_pod_log(
+                    name=pod_name,
+                    namespace=namespace,
+                    container='base',
+                    follow=False,
+                    tail_lines=100,
+                    _preload_content=False
+        )
 
     def gcs_read(self, remote_log_location):
         """
