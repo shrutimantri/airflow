@@ -145,7 +145,8 @@ class GCSTaskHandler(FileTaskHandler, LoggingMixin):
         """
         from airflow.contrib.kubernetes.kube_client import get_kube_client
         kube_client = get_kube_client()
-        return kube_client.read_namespaced_pod_log(
+        logs = ''
+        res = kube_client.read_namespaced_pod_log(
                     name=pod_name,
                     namespace=namespace,
                     container='base',
@@ -153,6 +154,9 @@ class GCSTaskHandler(FileTaskHandler, LoggingMixin):
                     tail_lines=100,
                     _preload_content=False
         )
+        for l in res:
+            logs += l.decode()
+        return logs
 
     def gcs_read(self, remote_log_location):
         """
