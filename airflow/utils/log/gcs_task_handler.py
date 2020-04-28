@@ -105,30 +105,31 @@ class GCSTaskHandler(FileTaskHandler, LoggingMixin):
         # in set_context method.
         log_relative_path = self._render_filename(ti, try_number)
         remote_loc = os.path.join(self.remote_base, log_relative_path)
+        log = ''
 
         try:
             remote_log = self.gcs_read(remote_loc)
-            log = '*** Reading remote log from {}.\n{}\n'.format(
+            log += '*** Reading remote log from {} ***\n{}\n'.format(
                 remote_loc, remote_log)
             return log, {'end_of_log': True}
         except Exception as e:
-            log = '*** Unable to read remote log from {}\n*** {}\n\n'.format(
+            log += '*** Unable to read remote log from {} ***\n{}\n\n'.format(
                 remote_loc, str(e))
             self.log.error(log)
             #TODO Sumit: Raise a PR in open source
             if configuration.conf.get('core', 'executor') == 'KubernetesExecutor':
-                log = '*** Trying to get logs from worker pod {}\n ***'.format(
+                log += '*** Trying to get logs from worker pod {} ***\n'.format(
                     ti.hostname
                 )
                 self.log.error(log)
                 try:
-                    logs = self._read_pod_logs(ti.hostname, configuration.conf.get('kubernetes', 'namespace'))
-                    return logs, {'end_of_log': True}
+                    log += self._read_pod_logs(ti.hostname, configuration.conf.get('kubernetes', 'namespace'))
                 except Exception as f:
-                    log = '*** Unable to fetch logs from worker pod {}\n*** {}\n\n'.format(
+                    log += '*** Unable to fetch logs from worker pod {} ***\n{}\n\n'.format(
                         ti.hostname, str(f)
                     )
                     self.log.error(log)
+                return log, {'end_of_log': True}
             else:
                 local_log, metadata = super(GCSTaskHandler, self)._read(ti, try_number)
                 log += local_log
@@ -145,7 +146,7 @@ class GCSTaskHandler(FileTaskHandler, LoggingMixin):
         """
         from airflow.contrib.kubernetes.kube_client import get_kube_client
         kube_client = get_kube_client()
-        logs = ''
+        logs = '*** .... latest 100 lines of logs from pod .... ***\n'
         res = kube_client.read_namespaced_pod_log(
                     name=pod_name,
                     namespace=namespace,
