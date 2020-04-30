@@ -19,11 +19,12 @@
 import os
 
 from cached_property import cached_property
+from urllib.parse import urlparse
 
 from airflow import configuration
 from airflow.exceptions import AirflowException
-from airflow.utils.log.logging_mixin import LoggingMixin
 from airflow.utils.log.file_task_handler import FileTaskHandler
+from airflow.utils.log.logging_mixin import LoggingMixin
 
 
 class GCSTaskHandler(FileTaskHandler, LoggingMixin):
@@ -34,7 +35,7 @@ class GCSTaskHandler(FileTaskHandler, LoggingMixin):
     failure, it reads from host machine's local disk.
     """
     def __init__(self, base_log_folder, gcs_log_folder, filename_template):
-        super(GCSTaskHandler, self).__init__(base_log_folder, filename_template)
+        super().__init__(base_log_folder, filename_template)
         self.remote_base = gcs_log_folder
         self.log_relative_path = ''
         self._hook = None
@@ -57,7 +58,7 @@ class GCSTaskHandler(FileTaskHandler, LoggingMixin):
             )
 
     def set_context(self, ti):
-        super(GCSTaskHandler, self).set_context(ti)
+        super().set_context(ti)
         # Log relative path is used to construct local and remote
         # log path to upload log files into GCS and read from the
         # remote location.
@@ -75,7 +76,7 @@ class GCSTaskHandler(FileTaskHandler, LoggingMixin):
         if self.closed:
             return
 
-        super(GCSTaskHandler, self).close()
+        super().close()
 
         if not self.upload_on_close:
             return
@@ -105,59 +106,19 @@ class GCSTaskHandler(FileTaskHandler, LoggingMixin):
         # in set_context method.
         log_relative_path = self._render_filename(ti, try_number)
         remote_loc = os.path.join(self.remote_base, log_relative_path)
-        log = ''
 
         try:
             remote_log = self.gcs_read(remote_loc)
-            log += '*** Reading remote log from {} ***\n{}\n'.format(
+            log = '*** Reading remote log from {}.\n{}\n'.format(
                 remote_loc, remote_log)
             return log, {'end_of_log': True}
         except Exception as e:
-            log += '*** Unable to read remote log from {} ***\n{}\n\n'.format(
+            log = '*** Unable to read remote log from {}\n*** {}\n\n'.format(
                 remote_loc, str(e))
             self.log.error(log)
-            #TODO Sumit: Raise a PR in open source
-            if configuration.conf.get('core', 'executor') == 'KubernetesExecutor':
-                log += '*** Trying to get logs from worker pod {} ***\n'.format(
-                    ti.hostname
-                )
-                self.log.error(log)
-                try:
-                    log += self._read_pod_logs(ti.hostname, configuration.conf.get('kubernetes', 'namespace'))
-                except Exception as f:
-                    log += '*** Unable to fetch logs from worker pod {} ***\n{}\n\n'.format(
-                        ti.hostname, str(f)
-                    )
-                    self.log.error(log)
-                return log, {'end_of_log': True}
-            else:
-                local_log, metadata = super(GCSTaskHandler, self)._read(ti, try_number)
-                log += local_log
-                return log, metadata
-
-    def _read_pod_logs(self, pod_name, namespace):
-        """
-        Tries to fetch execution logs (last 100 lines) from the pod and returns them.
-        May raise exceptions if pod not found or encounter perms issues
-        :param pod_name: the name of the worker pod
-        :type pod_name: str
-        :param namespace: the namespace on which the pod would be running
-        :type namespace: str
-        """
-        from airflow.contrib.kubernetes.kube_client import get_kube_client
-        kube_client = get_kube_client()
-        logs = '*** .... latest 100 lines of logs from pod .... ***\n'
-        res = kube_client.read_namespaced_pod_log(
-                    name=pod_name,
-                    namespace=namespace,
-                    container='base',
-                    follow=False,
-                    tail_lines=100,
-                    _preload_content=False
-        )
-        for l in res:
-            logs += l.decode()
-        return logs
+            local_log, metadata = super()._read(ti, try_number)
+            log += local_log
+            return log, metadata
 
     def gcs_read(self, remote_log_location):
         """
@@ -166,7 +127,7 @@ class GCSTaskHandler(FileTaskHandler, LoggingMixin):
         :type remote_log_location: str (path)
         """
         bkt, blob = self.parse_gcs_url(remote_log_location)
-        return self.hook.download(bkt, blob).decode()
+        return self.hook.download(bkt, blob).decode('utf-8')
 
     def gcs_write(self, log, remote_log_location, append=True):
         """
@@ -207,13 +168,6 @@ class GCSTaskHandler(FileTaskHandler, LoggingMixin):
         Given a Google Cloud Storage URL (gs://<bucket>/<blob>), returns a
         tuple containing the corresponding bucket and blob.
         """
-        # Python 3
-        try:
-            from urllib.parse import urlparse
-        # Python 2
-        except ImportError:
-            from urlparse import urlparse
-
         parsed_url = urlparse(gsurl)
         if not parsed_url.netloc:
             raise AirflowException('Please provide a bucket name')
