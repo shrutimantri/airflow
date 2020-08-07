@@ -560,3 +560,101 @@ class DagRunTest(unittest.TestCase):
         dagrun.verify_integrity()
         flaky_ti.refresh_from_db()
         self.assertEqual(State.NONE, flaky_ti.state)
+
+    def test_already_added_task_instances_can_be_ignored(self):
+        dag = DAG('triggered_dag', start_date=DEFAULT_DATE)
+        dag.add_task(DummyOperator(task_id='first_task', owner='test'))
+
+        dagrun = self.create_dag_run(dag)
+        first_ti = dagrun.get_task_instances()[0]
+        self.assertEqual('first_task', first_ti.task_id)
+        self.assertEqual(State.NONE, first_ti.state)
+
+        # Lets assume that the above TI was added into DB by webserver, but if scheduler
+        # is running the same method at the same time it would find 0 TIs for this dag
+        # and proceeds further to create TIs. Hence mocking DagRun.get_task_instances
+        # method to return an empty list of TIs.
+        with mock.patch.object(DagRun, 'get_task_instances') as mock_gtis:
+            mock_gtis.return_value = []
+            dagrun.verify_integrity()
+            first_ti.refresh_from_db()
+            self.assertEqual(State.NONE, first_ti.state)
+
+    @parameterized.expand([(state,) for state in State.task_states])
+    @mock.patch('airflow.models.dagrun.task_instance_mutation_hook')
+    def test_task_instance_mutation_hook(self, state, mock_hook):
+        def mutate_task_instance(task_instance):
+            if task_instance.queue == 'queue1':
+                task_instance.queue = 'queue2'
+            else:
+                task_instance.queue = 'queue1'
+
+        mock_hook.side_effect = mutate_task_instance
+
+        dag = DAG('test_task_instance_mutation_hook', start_date=DEFAULT_DATE)
+        dag.add_task(DummyOperator(task_id='task_to_mutate', owner='test', queue='queue1'))
+
+        dagrun = self.create_dag_run(dag)
+        task = dagrun.get_task_instances()[0]
+        session = settings.Session()
+        task.state = state
+        session.merge(task)
+        session.commit()
+        assert task.queue == 'queue2'
+
+        dagrun.verify_integrity()
+        task = dagrun.get_task_instances()[0]
+        assert task.queue == 'queue1'
+
+    @parameterized.expand([
+        (State.SUCCESS, True),
+        (State.SKIPPED, True),
+        (State.RUNNING, False),
+        (State.FAILED, False),
+        (State.NONE, False),
+    ])
+    def test_depends_on_past(self, prev_ti_state, is_ti_success):
+        dag_id = 'test_depends_on_past'
+
+        dag = self.dagbag.get_dag(dag_id)
+        task = dag.tasks[0]
+
+        self.create_dag_run(dag, execution_date=timezone.datetime(2016, 1, 1, 0, 0, 0))
+        self.create_dag_run(dag, execution_date=timezone.datetime(2016, 1, 2, 0, 0, 0))
+
+        prev_ti = TI(task, timezone.datetime(2016, 1, 1, 0, 0, 0))
+        ti = TI(task, timezone.datetime(2016, 1, 2, 0, 0, 0))
+
+        prev_ti.set_state(prev_ti_state)
+        ti.set_state(State.QUEUED)
+        ti.run()
+        self.assertEqual(ti.state == State.SUCCESS, is_ti_success)
+
+    @parameterized.expand([
+        (State.SUCCESS, True),
+        (State.SKIPPED, True),
+        (State.RUNNING, False),
+        (State.FAILED, False),
+        (State.NONE, False),
+    ])
+    def test_wait_for_downstream(self, prev_ti_state, is_ti_success):
+        dag_id = 'test_wait_for_downstream'
+        dag = self.dagbag.get_dag(dag_id)
+        upstream, downstream = dag.tasks
+
+        # For ti.set_state() to work, the DagRun has to exist,
+        # Otherwise ti.previous_ti returns an unpersisted TI
+        self.create_dag_run(dag, execution_date=timezone.datetime(2016, 1, 1, 0, 0, 0))
+        self.create_dag_run(dag, execution_date=timezone.datetime(2016, 1, 2, 0, 0, 0))
+
+        prev_ti_downstream = TI(task=downstream, execution_date=timezone.datetime(2016, 1, 1, 0, 0, 0))
+        ti = TI(task=upstream, execution_date=timezone.datetime(2016, 1, 2, 0, 0, 0))
+        prev_ti = ti.get_previous_ti()
+        prev_ti.set_state(State.SUCCESS)
+        self.assertEqual(prev_ti.state, State.SUCCESS)
+
+        prev_ti_downstream.set_state(prev_ti_state)
+        ti.set_state(State.QUEUED)
+        ti.run()
+        self.assertEqual(ti.state == State.SUCCESS, is_ti_success)
+>>>>>>> 2102122... Handle IntegrityError while creating TIs (#10136)
