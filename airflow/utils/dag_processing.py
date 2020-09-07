@@ -22,6 +22,7 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
+import inspect
 import logging
 import multiprocessing
 import os
@@ -788,6 +789,7 @@ class DagFileProcessorManager(LoggingMixin):
         Helper method to clean up DAG file processors to avoid leaving orphan processes.
         """
         self.log.info("Exiting gracefully upon receiving signal %s", signum)
+        self.log.debug("Current Stacktrace is: %s", '\n'.join(map(str, inspect.stack())))
         self.terminate()
         self.end()
         self.log.debug("Finished terminating DAG processors.")

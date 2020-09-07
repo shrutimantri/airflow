@@ -23,6 +23,7 @@ from sqlalchemy import (
     Column, Integer, String, Boolean, PickleType, Index, UniqueConstraint, func, DateTime, or_,
     and_
 )
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.orm import synonym
 from sqlalchemy.orm.session import Session
@@ -359,9 +360,9 @@ class DagRun(Base, LoggingMixin):
         tis = self.get_task_instances(session=session)
 
         # check for removed or restored tasks
-        task_ids = []
+        task_ids = set()
         for ti in tis:
-            task_ids.append(ti.task_id)
+            task_ids.add(ti.task_id)
             task = None
             try:
                 task = dag.get_task(ti.task_id)
@@ -395,7 +396,14 @@ class DagRun(Base, LoggingMixin):
                 ti = TaskInstance(task, self.execution_date)
                 session.add(ti)
 
-        session.commit()
+        try:
+            session.commit()
+        except IntegrityError as err:
+            self.log.info(str(err))
+            self.log.info('Hit IntegrityError while creating the TIs for '
+                          f'{dag.dag_id} - {self.execution_date}.')
+            self.log.info('Doing session rollback.')
+            session.rollback()
 
     @staticmethod
     def get_run(session, dag_id, execution_date):
