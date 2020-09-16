@@ -66,6 +66,7 @@ spec:
         self.extract_security_context(pod, req)
         self.extract_dnspolicy(pod, req)
         self.extract_priority_class(pod, req)
+        self.extract_lifecycle(pod, req)
         return req
 
 
@@ -137,4 +138,5 @@ spec:
         self.extract_security_context(pod, req)
         self.extract_dnspolicy(pod, req)
         self.extract_priority_class(pod, req)
+        self.extract_lifecycle(pod, req)
         return req
