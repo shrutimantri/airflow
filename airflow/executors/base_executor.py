@@ -57,9 +57,10 @@ class BaseExecutor(LoggingMixin):
         key = simple_task_instance.key
         if key not in self.queued_tasks and key not in self.running:
             self.log.info("Adding to queue: %s", command)
+            self.queued_tasks[key] = (command, priority, queue, simple_task_instance)
         else:
-            self.log.info("Adding to queue even though already queued or running {}".format(command, key))
-        self.queued_tasks[key] = (command, priority, queue, simple_task_instance)
+            self.log.info("Task already queued or running {}".format(command, key))
+
 
     def queue_task_instance(
             self,
