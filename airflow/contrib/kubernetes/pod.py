@@ -114,7 +114,8 @@ class Pod:
             configmaps=None,
             pod_runtime_info_envs=None,
             dnspolicy=None,
-            priority_class=None
+            priority_class=None,
+            lifecycle=None
     ):
         self.image = image
         self.envs = envs or {}
@@ -143,3 +144,4 @@ class Pod:
         self.pod_runtime_info_envs = pod_runtime_info_envs or []
         self.dnspolicy = dnspolicy
         self.priority_class = priority_class
+        self.lifecycle = lifecycle or {}

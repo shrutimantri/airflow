@@ -262,3 +262,8 @@ class KubernetesRequestFactory:
     def extract_priority_class(pod, req):
         if pod.priority_class:
             req['spec']['priorityClassName'] = pod.priority_class
+
+    @staticmethod
+    def extract_lifecycle(pod, req):
+        if pod.lifecycle:
+            req['spec']['containers'][0]['lifecycle'] = pod.lifecycle
