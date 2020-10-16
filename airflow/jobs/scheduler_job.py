@@ -1370,7 +1370,6 @@ class SchedulerJob(BaseJob):
         while (timezone.utcnow() - execute_start_time).total_seconds() < \
                 self.run_duration or self.run_duration < 0:
             self.log.debug("Starting Loop...")
-            execute_start_time = timezone.utcnow()
             loop_start_time = time.time()
 
             if self.using_sqlite:
@@ -1454,16 +1453,6 @@ class SchedulerJob(BaseJob):
                 self.log.debug("Sleeping for %.2f seconds", self._processor_poll_interval)
                 time.sleep(self._processor_poll_interval)
 
-            # Verify that all files were processed, and if so, deactivate DAGs that
-            # haven't been touched by the scheduler as they likely have been
-            # deleted.
-            if self.processor_agent.all_files_processed:
-                self.log.info(
-                    "Deactivating DAGs that haven't been touched since %s",
-                    execute_start_time.isoformat()
-                )
-                models.DAG.deactivate_stale_dags(execute_start_time)
-
             if self.processor_agent.done:
                 self.log.info("Exiting scheduler loop as all files"
                               " have been processed {} times".format(self.num_runs))
@@ -1480,6 +1469,16 @@ class SchedulerJob(BaseJob):
         self.log.info("Terminating DAG processors")
         self.processor_agent.terminate()
         self.log.info("All DAG processors terminated")
+
+        # Verify that all files were processed, and if so, deactivate DAGs that
+        # haven't been touched by the scheduler as they likely have been
+        # deleted.
+        if self.processor_agent.all_files_processed:
+            self.log.info(
+                "Deactivating DAGs that haven't been touched since %s",
+                execute_start_time.isoformat()
+            )
+            models.DAG.deactivate_stale_dags(execute_start_time)
 
         self.executor.end()
 
