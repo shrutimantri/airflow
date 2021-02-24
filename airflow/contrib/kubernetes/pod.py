@@ -165,6 +165,7 @@ class Pod(object):
                     env=[k8s.V1EnvVar(name=key, value=val) for key, val in self.envs.items()],
                     args=self.args,
                     image_pull_policy=self.image_pull_policy,
+                    lifecycle=self.lifecycle
                 )
             ],
             image_pull_secrets=image_pull_secrets,

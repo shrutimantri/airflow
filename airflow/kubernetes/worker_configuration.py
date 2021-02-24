@@ -205,7 +205,7 @@ class WorkerConfiguration(LoggingMixin):
         os_env = os.environ
         os_env.update(env)
         env = os_env
-        return env
+        return dict(env)
 
     def _get_configmaps(self):
         """Extracts any configmapRefs to envFrom"""
@@ -440,6 +440,18 @@ class WorkerConfiguration(LoggingMixin):
         """Creates POD."""
         if self.kube_config.pod_template_file:
             return PodGenerator(pod_template_file=self.kube_config.pod_template_file).gen_pod()
+        environment = self._get_environment()
+
+        resources = k8s.V1ResourceRequirements(
+            limits={
+                "memory": self.kube_config.kube_worker_resources.get('limit_memory'),
+                "cpu": self.kube_config.kube_worker_resources.get('limit_cpu')
+            },
+            requests={
+                "memory": self.kube_config.kube_worker_resources.get('request_memory'),
+                "cpu": self.kube_config.kube_worker_resources.get('request_cpu'),
+            }
+        )
         pod = PodGenerator(
             image=self.kube_config.kube_image,
             image_pull_policy=self.kube_config.kube_image_pull_policy or 'IfNotPresent',
@@ -451,10 +463,12 @@ class WorkerConfiguration(LoggingMixin):
             annotations=self.kube_config.kube_annotations,
             affinity=self.kube_config.kube_affinity,
             tolerations=self.kube_config.kube_tolerations,
-            envs=self._get_environment(),
+            envs=environment,
             node_selectors=self.kube_config.kube_node_selectors,
             service_account_name=self.kube_config.worker_service_account_name or 'default',
-            restart_policy='Never'
+            restart_policy='Never',
+            resources=resources,
+            priority_class_name=environment.get('AIRFLOW_POD_PRIORITY_CLASS', None)
         ).gen_pod()
 
         pod.spec.containers[0].env_from = pod.spec.containers[0].env_from or []

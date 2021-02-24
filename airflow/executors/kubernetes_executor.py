@@ -80,7 +80,7 @@ class KubeConfig:
         self.kube_annotations = configuration_dict.get('kubernetes_annotations', {}) or None
         self.pod_template_file = conf.get(self.kubernetes_section, 'pod_template_file',
                                           fallback=None)
-
+        self.kube_worker_resources = configuration_dict.get('kubernetes_worker_resources', {})
         self.kube_labels = configuration_dict.get('kubernetes_labels', {})
         self.delete_worker_pods = conf.getboolean(
             self.kubernetes_section, 'delete_worker_pods')
